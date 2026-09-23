@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Galaxia de Flores Amarillas - Te Quiero Kimberly</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js and OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #030108;
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: #fff;
+            position: fixed;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Golden Glowing Header Typography */
+        .glow-title {
+            font-family: 'Cinzel', serif;
+            background: linear-gradient(135deg, #FFFDE7 0%, #FFD700 45%, #FFB300 75%, #FF8F00 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.75), 0 0 40px rgba(255, 179, 0, 0.4);
+            filter: drop-shadow(0px 0px 15px rgba(255, 215, 0, 0.85));
+        }
+
+        /* 3D Planet Floating Labels */
+        .planet-label {
+            position: absolute;
+            z-index: 5;
+            transform: translate(-50%, -100%);
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .planet-label-inner {
+            background: rgba(18, 9, 32, 0.85);
+            border: 1px solid rgba(255, 215, 0, 0.7);
+            box-shadow: 0 0 18px rgba(255, 215, 0, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 5px 12px;
+            border-radius: 18px;
+            color: #FFF8E1;
+            font-weight: 600;
+            font-size: 0.75rem;
+            letter-spacing: 0.8px;
+            white-space: nowrap;
+        }
+
+        /* iOS Safe Glassmorphism Cards */
+        .glass-card {
+            background: rgba(16, 10, 30, 0.88);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 215, 0, 0.5);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8),
+                        0 0 30px rgba(255, 215, 0, 0.25);
+        }
+
+        @keyframes pulseGlow {
+            0% { transform: scale(1); filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.7)); }
+            100% { transform: scale(1.03); filter: drop-shadow(0 0 28px rgba(255, 215, 0, 0.95)); }
+        }
+        .animate-pulse-glow {
+            animation: pulseGlow 3s ease-in-out infinite alternate;
+        }
+
+        #youtube-player-container {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0.001;
+            pointer-events: none;
+            left: -9999px;
+            top: -9999px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- iOS Entry Modal (Crucial to unblock iOS Safari Audio Autoplay restriction) -->
+    <div id="welcome-modal" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/92 backdrop-blur-xl p-6 text-center select-none">
+        <div class="glass-card p-7 sm:p-10 rounded-3xl max-w-sm sm:max-w-md w-full flex flex-col items-center gap-5 border border-amber-400/70 shadow-[0_0_50px_rgba(255,215,0,0.35)]">
+            <div class="text-5xl sm:text-6xl animate-bounce">🌻</div>
+            <div>
+                <span class="text-amber-300/80 text-xs tracking-widest font-semibold uppercase block mb-1">Dedicado a</span>
+                <h1 class="glow-title text-3xl sm:text-4xl font-extrabold tracking-wider">
+                    KIMBERLY
+                </h1>
+            </div>
+            <p class="text-amber-100/90 text-xs sm:text-sm leading-relaxed font-light">
+                Una galaxia interactiva en 3D con ramos de flores amarillas y música de piano para ti.
+            </p>
+            
+            <button id="start-experience-btn" class="w-full py-4 px-6 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 font-bold text-base sm:text-lg rounded-full shadow-[0_0_25px_rgba(255,215,0,0.85)] transition-all duration-300 transform active:scale-95 hover:scale-105 cursor-pointer flex items-center justify-center gap-2">
+                <span>✨ Toca aquí para iniciar ✨</span>
+            </button>
+            <span class="text-[11px] text-amber-300/70 italic">
+                Optimizado para iPhone y dispositivos móviles
+            </span>
+        </div>
+    </div>
+
+    <!-- WebGL Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- YouTube Frame for Original Track -->
+    <div id="youtube-player-container">
+        <div id="youtube-player"></div>
+    </div>
+
+    <!-- Main Title above Sun -->
+    <header class="absolute top-4 sm:top-6 left-1/2 transform -translate-x-1/2 z-10 text-center w-full px-3 pointer-events-none">
+        <div class="inline-block relative">
+            <span class="block text-amber-300/80 text-[10px] sm:text-xs tracking-widest font-semibold uppercase mb-0.5">
+                ✦ PARA MI PERSONA FAVORITA ✦
+            </span>
+            <h1 class="glow-title text-2xl sm:text-4xl md:text-5xl font-black tracking-widest uppercase mb-0.5 animate-pulse-glow">
+                TE QUIERO KIMBERLY
+            </h1>
+            <p class="text-amber-100/80 text-[11px] sm:text-xs tracking-wide font-light drop-shadow-md">
+                Toca cada ramo de flores amarillas para ver su mensaje
+            </p>
+        </div>
+    </header>
+
+    <!-- Labels for 3D Planets -->
+    <div id="labels-container" class="absolute top-0 left-0 w-full h-full pointer-events-none z-5 overflow-hidden"></div>
+
+    <!-- iOS Audio & View Controls -->
+    <div class="absolute bottom-5 left-1/2 transform -translate-x-1/2 sm:left-6 sm:transform-none z-10 flex flex-wrap justify-center gap-2.5 w-[92%] sm:w-auto">
+        <button id="music-toggle-btn" class="glass-card hover:bg-amber-500/20 text-amber-300 border border-amber-400/60 px-4 py-2.5 rounded-full text-xs font-semibold tracking-wider flex items-center gap-2 transition duration-300 shadow-lg cursor-pointer active:scale-95">
+            <svg id="music-icon-play" class="w-4 h-4 fill-current hidden" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="music-icon-pause" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            <span id="music-btn-text">MÚSICA: ON</span>
+        </button>
+
+        <button id="reset-cam-btn" class="glass-card hover:bg-amber-500/20 text-amber-300 border border-amber-400/50 px-4 py-2.5 rounded-full text-xs font-semibold tracking-wider flex items-center gap-2 transition duration-300 shadow-lg cursor-pointer active:scale-95">
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+            VISTA GRAL.
+        </button>
+    </div>
+
+    <!-- Modal Card for Compliments -->
+    <div id="info-modal" class="glass-card fixed bottom-20 sm:bottom-8 left-1/2 transform -translate-x-1/2 z-20 w-[90%] max-w-md p-5 sm:p-6 rounded-3xl transition-all duration-500 opacity-0 pointer-events-none translate-y-8">
+        <button id="close-modal-btn" class="absolute top-3.5 right-4 text-amber-400 hover:text-white text-xl font-bold p-1 transition cursor-pointer">✕</button>
+        <div class="flex items-center gap-3 mb-2">
+            <span class="text-3xl">💐</span>
+            <div>
+                <span class="text-[10px] text-amber-400/80 font-semibold tracking-wider uppercase">RAMO #<span id="modal-index">1</span></span>
+                <h2 id="modal-title" class="text-xl sm:text-2xl font-bold text-amber-300 tracking-wide font-serif"></h2>
+            </div>
+        </div>
+        <p id="modal-desc" class="text-slate-100 text-xs sm:text-sm leading-relaxed font-light mt-2.5"></p>
+        <div class="mt-3.5 pt-2.5 border-t border-amber-500/30 flex justify-between items-center text-[11px] text-amber-300/70">
+            <span>✨ Galaxia de Flores</span>
+            <span class="italic font-medium">Te quiero, Kimberly</span>
+        </div>
+    </div>
+
+    <script>
+        const PLANETS_DATA = [
+            {
+                title: "Eres hermosa",
+                desc: "Tu belleza irradia luz y alegría. Tu sonrisa ilumina todo a tu alrededor.",
+                flowerTypes: ['sunflower', 'rose'],
+                colorHex: 0xFFD700,
+                radius: 20,
+                speed: 0.0028,
+                size: 3.8
+            },
+            {
+                title: "Preciosa",
+                desc: "Eres valiosa, única y tan especial. Un tesoro lleno de encanto.",
+                flowerTypes: ['tulip', 'daisy'],
+                colorHex: 0xFFEB3B,
+                radius: 29,
+                speed: 0.0023,
+                size: 3.6
+            },
+            {
+                title: "Brillante",
+                desc: "Tu inteligencia y creatividad brillan intensamente. Iluminas todo a tu paso.",
+                flowerTypes: ['sunflower', 'daisy', 'rose'],
+                colorHex: 0xFFC107,
+                radius: 39,
+                speed: 0.0019,
+                size: 4.1
+            },
+            {
+                title: "Fenomenal",
+                desc: "Eres extraordinaria, increíble y excepcional. Capaz de lograr todo lo que te propongas.",
+                flowerTypes: ['rose', 'tulip', 'lily'],
+                colorHex: 0xFFCA28,
+                radius: 49,
+                speed: 0.0015,
+                size: 3.7
+            },
+            {
+                title: "Trabajadora",
+                desc: "Tu dedicación, esfuerzo y pasión son admirables. Tu constancia te llevará muy lejos.",
+                flowerTypes: ['sunflower', 'tulip'],
+                colorHex: 0xFFD54F,
+                radius: 59,
+                speed: 0.0012,
+                size: 3.9
+            },
+            {
+                title: "Digna de admirar",
+                desc: "Eres una inspiración para todos. Tu fuerza y carácter son verdaderamente admirables.",
+                flowerTypes: ['rose', 'daisy', 'lily'],
+                colorHex: 0xFFE082,
+                radius: 69,
+                speed: 0.00095,
+                size: 4.3
+            },
+            {
+                title: "Perfecta",
+                desc: "Con todas tus cualidades y tu esencia auténtica, eres sencillamente perfecta.",
+                flowerTypes: ['sunflower', 'rose', 'tulip', 'daisy', 'lily'],
+                colorHex: 0xFFF59D,
+                radius: 79,
+                speed: 0.00075,
+                size: 4.5
+            },
+            {
+                title: "Genial",
+                desc: "Eres fantástica, divertida y auténtica. Haces que el mundo sea un lugar mejor.",
+                flowerTypes: ['tulip', 'daisy'],
+                colorHex: 0xFFECB3,
+                radius: 89,
+                speed: 0.00055,
+                size: 3.8
+            }
+        ];
+
+        let scene, camera, renderer, controls;
+        let bouquetPlanets = [];
+        let floatingPetalsSystem;
+        let galaxyParticleSystem;
+        let isAutoRotating = true;
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        const labelsContainer = document.getElementById('labels-container');
+        const infoModal = document.getElementById('info-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalDesc = document.getElementById('modal-desc');
+        const modalIndex = document.getElementById('modal-index');
+
+        let ytPlayer;
+        let isMusicPlaying = false;
+        let audioCtx, synthNotesInterval;
+
+        // Load YouTube IFrame Player API
+        const tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+        function onYouTubeIframeAPIReady() {
+            ytPlayer = new YT.Player('youtube-player', {
+                height: '100',
+                width: '100',
+                videoId: 'mwdGmw9PD2E',
+                playerVars: {
+                    'autoplay': 1,
+                    'controls': 0,
+                    'loop': 1,
+                    'playlist': 'mwdGmw9PD2E',
+                    'playsinline': 1,
+                    'enablejsapi': 1
+                },
+                events: {
+                    'onReady': (e) => {
+                        try {
+                            e.target.setVolume(100);
+                        } catch(err) {}
+                    }
+                }
+            });
+        }
+
+        /* iOS Safari Native Web Audio Synthesizer (The Piano Duet Melody Fallback) */
+        function initNativePianoSynth() {
+            if (audioCtx) return;
+            try {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContextClass();
+
+                // "The Piano Duet" chord progression frequencies
+                const chordProgression = [
+                    [261.63, 329.63, 392.00, 493.88], // Cmaj7
+                    [220.00, 261.63, 329.63, 392.00], // Am7
+                    [174.61, 220.00, 261.63, 329.63], // Fmaj7
+                    [196.00, 246.94, 293.66, 392.00]  // G7
+                ];
+
+                let chordIndex = 0;
+                let noteIndex = 0;
+
+                synthNotesInterval = setInterval(() => {
+                    if (!isMusicPlaying || !audioCtx) return;
+
+                    const chord = chordProgression[chordIndex];
+                    const freq = chord[noteIndex % chord.length];
+
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+                    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.09, audioCtx.currentTime + 0.15);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 2.2);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 2.3);
+
+                    noteIndex++;
+                    if (noteIndex % 8 === 0) {
+                        chordIndex = (chordIndex + 1) % chordProgression.length;
+                    }
+                }, 400);
+
+            } catch (e) {
+                console.log("Web Audio error", e);
+            }
+        }
+
+        function playMusic() {
+            isMusicPlaying = true;
+            updateMusicButtonUI();
+
+            if (ytPlayer && typeof ytPlayer.playVideo === 'function') {
+                try {
+                    ytPlayer.unMute();
+                    ytPlayer.setVolume(100);
+                    ytPlayer.playVideo();
+                } catch(e) {}
+            }
+
+            initNativePianoSynth();
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function pauseMusic() {
+            isMusicPlaying = false;
+            updateMusicButtonUI();
+
+            if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') {
+                try { ytPlayer.pauseVideo(); } catch(e) {}
+            }
+            if (audioCtx && audioCtx.state === 'running') {
+                audioCtx.suspend();
+            }
+        }
+
+        function toggleMusic() {
+            if (isMusicPlaying) pauseMusic();
+            else playMusic();
+        }
+
+        function updateMusicButtonUI() {
+            const playIcon = document.getElementById('music-icon-play');
+            const pauseIcon = document.getElementById('music-icon-pause');
+            const btnText = document.getElementById('music-btn-text');
+
+            if (isMusicPlaying) {
+                playIcon.classList.add('hidden');
+                pauseIcon.classList.remove('hidden');
+                btnText.innerText = "MÚSICA: ON";
+            } else {
+                pauseIcon.classList.add('hidden');
+                playIcon.classList.remove('hidden');
+                btnText.innerText = "MÚSICA: OFF";
+            }
+        }
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x030108, 0.0032);
+
+            camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 45, 100);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            container.appendChild(renderer.domElement);
+
+            // iOS Touch optimized OrbitControls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 160;
+            controls.minDistance = 12;
+            controls.maxPolarAngle = Math.PI / 2 + 0.1;
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.PointLight(0xFFD700, 3.8, 300);
+            sunLight.position.set(0, 0, 0);
+            scene.add(sunLight);
+
+            const dirLight = new THREE.DirectionalLight(0xFFF59D, 1.1);
+            dirLight.position.set(30, 50, 40);
+            scene.add(dirLight);
+
+            createCentralSun();
+            createSpiralGalaxy();
+            createFloatingPetals();
+
+            // Create orbiting bouquet planets
+            PLANETS_DATA.forEach((data, idx) => {
+                const planetObj = createFlowerBouquetPlanet(data, idx);
+                bouquetPlanets.push(planetObj);
+                scene.add(planetObj.pivot);
+
+                createPlanetLabel(data, idx);
+            });
+
+            // Event Handlers for Touch and Click
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('pointerdown', onPointerDown);
+
+            document.getElementById('reset-cam-btn').addEventListener('click', resetCamera);
+            document.getElementById('close-modal-btn').addEventListener('click', closeModal);
+            document.getElementById('music-toggle-btn').addEventListener('click', toggleMusic);
+
+            // iOS Safari User Gesture Activation
+            const startBtn = document.getElementById('start-experience-btn');
+            const handleStart = (e) => {
+                e.preventDefault();
+                const welcomeModal = document.getElementById('welcome-modal');
+                welcomeModal.classList.add('opacity-0', 'transition-opacity', 'duration-500', 'pointer-events-none');
+                setTimeout(() => welcomeModal.remove(), 500);
+
+                playMusic();
+            };
+            startBtn.addEventListener('click', handleStart);
+            startBtn.addEventListener('touchstart', handleStart, { passive: false });
+
+            animate();
+        }
+
+        function createCentralSun() {
+            const sunGroup = new THREE.Group();
+
+            const sunGeo = new THREE.IcosahedronGeometry(7.5, 3);
+            const sunMat = new THREE.MeshStandardMaterial({
+                color: 0xFFD700,
+                emissive: 0xFF8F00,
+                emissiveIntensity: 1.1,
+                roughness: 0.25,
+                metalness: 0.3
+            });
+            const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+            sunGroup.add(sunMesh);
+
+            const glowGeo = new THREE.SphereGeometry(10, 24, 24);
+            const glowMat = new THREE.MeshBasicMaterial({
+                color: 0xFFC107,
+                transparent: true,
+                opacity: 0.32,
+                side: THREE.BackSide
+            });
+            sunGroup.add(new THREE.Mesh(glowGeo, glowMat));
+
+            for (let i = 0; i < 3; i++) {
+                const ringGeo = new THREE.TorusGeometry(12 + i * 2.5, 0.18, 12, 60);
+                const ringMat = new THREE.MeshBasicMaterial({
+                    color: 0xFFE082,
+                    transparent: true,
+                    opacity: 0.5 - i * 0.12
+                });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.rotation.x = Math.PI / 2 + (i * 0.18);
+                ring.rotation.y = i * 0.35;
+                sunGroup.add(ring);
+            }
+
+            scene.add(sunGroup);
+
+            function animateSun() {
+                sunGroup.rotation.y += 0.003;
+                requestAnimationFrame(animateSun);
+            }
+            animateSun();
+        }
+
+        function createFlowerBouquetPlanet(data, index) {
+            const pivot = new THREE.Group();
+            const bouquetGroup = new THREE.Group();
+
+            const angle = (index / PLANETS_DATA.length) * Math.PI * 2;
+            bouquetGroup.position.x = Math.cos(angle) * data.radius;
+            bouquetGroup.position.z = Math.sin(angle) * data.radius;
+            bouquetGroup.position.y = (Math.sin(index * 1.5)) * 3;
+
+            // Green foliage base
+            const baseGeo = new THREE.SphereGeometry(data.size * 0.7, 18, 18);
+            const baseMat = new THREE.MeshStandardMaterial({ color: 0x1e5336, roughness: 0.85 });
+            const baseSphere = new THREE.Mesh(baseGeo, baseMat);
+            baseSphere.userData = { planetIndex: index };
+            bouquetGroup.add(baseSphere);
+
+            // Populate bouquet surface with 3D yellow flowers
+            const flowerCount = Math.floor(45 + data.size * 15);
+            const phi = Math.PI * (3 - Math.sqrt(5));
+
+            for (let i = 0; i < flowerCount; i++) {
+                const y = 1 - (i / (flowerCount - 1)) * 2;
+                const radiusAtY = Math.sqrt(1 - y * y);
+                const theta = phi * i;
+
+                const x = Math.cos(theta) * radiusAtY;
+                const z = Math.sin(theta) * radiusAtY;
+
+                const dir = new THREE.Vector3(x, y, z).normalize();
+                const pos = dir.clone().multiplyScalar(data.size * 0.72);
+
+                const flowerType = data.flowerTypes[i % data.flowerTypes.length];
+                const flowerMesh = build3DFlower(flowerType, data.colorHex);
+
+                flowerMesh.position.copy(pos);
+                flowerMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+
+                const randScale = 0.5 + Math.random() * 0.45;
+                flowerMesh.scale.set(randScale, randScale, randScale);
+
+                bouquetGroup.add(flowerMesh);
+            }
+
+            // Green leaves
+            for (let l = 0; l < 25; l++) {
+                const leaf = build3DLeaf();
+                const randDir = new THREE.Vector3(
+                    (Math.random() - 0.5),
+                    (Math.random() - 0.5),
+                    (Math.random() - 0.5)
+                ).normalize();
+
+                leaf.position.copy(randDir.clone().multiplyScalar(data.size * 0.7));
+                leaf.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), randDir);
+                leaf.scale.setScalar(0.6 + Math.random() * 0.4);
+                bouquetGroup.add(leaf);
+            }
+
+            // Golden ribbon
+            const ribbonGeo = new THREE.TorusGeometry(data.size * 0.46, 0.12, 10, 24);
+            const ribbonMat = new THREE.MeshStandardMaterial({ color: 0xFFD700, metalness: 0.8, roughness: 0.2 });
+            const ribbon = new THREE.Mesh(ribbonGeo, ribbonMat);
+            ribbon.rotation.x = Math.PI / 2;
+            ribbon.position.y = -data.size * 0.55;
+            bouquetGroup.add(ribbon);
+
+            // Orbit line
+            const orbitGeo = new THREE.BufferGeometry();
+            const orbitPoints = [];
+            for (let j = 0; j <= 96; j++) {
+                const a = (j / 96) * Math.PI * 2;
+                orbitPoints.push(new THREE.Vector3(Math.cos(a) * data.radius, 0, Math.sin(a) * data.radius));
+            }
+            orbitGeo.setFromPoints(orbitPoints);
+            const orbitMat = new THREE.LineBasicMaterial({ color: 0xFFD700, transparent: true, opacity: 0.18 });
+            scene.add(new THREE.Line(orbitGeo, orbitMat));
+
+            pivot.add(bouquetGroup);
+
+            return {
+                pivot: pivot,
+                mesh: bouquetGroup,
+                baseSphere: baseSphere,
+                data: data,
+                angle: angle,
+                radius: data.radius,
+                speed: data.speed,
+                index: index
+            };
+        }
+
+        function build3DFlower(type, colorHex) {
+            const flowerGroup = new THREE.Group();
+
+            if (type === 'sunflower') {
+                const center = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.45, 0.45, 0.12, 10),
+                    new THREE.MeshStandardMaterial({ color: 0x3E2211, roughness: 0.9 })
+                );
+                flowerGroup.add(center);
+
+                const petalGeo = new THREE.ConeGeometry(0.2, 1.1, 4);
+                petalGeo.rotateX(Math.PI / 2);
+                const petalMat = new THREE.MeshStandardMaterial({ color: 0xFFC107, roughness: 0.35 });
+
+                for (let i = 0; i < 12; i++) {
+                    const a = (i / 12) * Math.PI * 2;
+                    const petal = new THREE.Mesh(petalGeo, petalMat);
+                    petal.position.set(Math.cos(a) * 0.55, 0, Math.sin(a) * 0.55);
+                    petal.rotation.y = -a + Math.PI / 2;
+                    flowerGroup.add(petal);
+                }
+            } else if (type === 'rose') {
+                const petalMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.4, side: THREE.DoubleSide });
+                for (let layer = 0; layer < 3; layer++) {
+                    const count = 4 + layer * 2;
+                    const rad = 0.15 + layer * 0.15;
+                    for (let i = 0; i < count; i++) {
+                        const a = (i / count) * Math.PI * 2 + layer;
+                        const petal = new THREE.Mesh(
+                            new THREE.SphereGeometry(0.25 + layer * 0.06, 6, 6, 0, Math.PI, 0, Math.PI / 2),
+                            petalMat
+                        );
+                        petal.position.set(Math.cos(a) * rad, layer * 0.04, Math.sin(a) * rad);
+                        petal.rotation.y = a;
+                        flowerGroup.add(petal);
+                    }
+                }
+            } else if (type === 'tulip') {
+                const petalMat = new THREE.MeshStandardMaterial({ color: 0xFFEA00, roughness: 0.3, side: THREE.DoubleSide });
+                for (let i = 0; i < 5; i++) {
+                    const a = (i / 5) * Math.PI * 2;
+                    const petal = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.38, 6, 6, 0, Math.PI / 2, 0, Math.PI),
+                        petalMat
+                    );
+                    petal.position.set(Math.cos(a) * 0.22, 0.15, Math.sin(a) * 0.22);
+                    petal.rotation.y = a;
+                    flowerGroup.add(petal);
+                }
+            } else if (type === 'lily') {
+                const petalMat = new THREE.MeshStandardMaterial({ color: 0xFFF176, roughness: 0.35 });
+                for (let i = 0; i < 6; i++) {
+                    const a = (i / 6) * Math.PI * 2;
+                    const petalGeo = new THREE.ConeGeometry(0.2, 1.1, 4);
+                    petalGeo.rotateX(Math.PI / 2);
+                    const petal = new THREE.Mesh(petalGeo, petalMat);
+                    petal.position.set(Math.cos(a) * 0.38, 0, Math.sin(a) * 0.38);
+                    petal.rotation.y = -a;
+                    flowerGroup.add(petal);
+                }
+            } else { // Daisy
+                const center = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.25, 6, 6),
+                    new THREE.MeshStandardMaterial({ color: 0xFF8F00 })
+                );
+                flowerGroup.add(center);
+
+                const petalMat = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.3 });
+                for (let i = 0; i < 9; i++) {
+                    const a = (i / 9) * Math.PI * 2;
+                    const petal = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.03, 0.7), petalMat);
+                    petal.position.set(Math.cos(a) * 0.48, 0, Math.sin(a) * 0.48);
+                    petal.rotation.y = a;
+                    flowerGroup.add(petal);
+                }
+            }
+
+            return flowerGroup;
+        }
+
+        function build3DLeaf() {
+            const leafGeo = new THREE.ConeGeometry(0.25, 1.0, 4);
+            leafGeo.scale(1, 0.08, 1);
+            return new THREE.Mesh(
+                leafGeo,
+                new THREE.MeshStandardMaterial({ color: 0x276749, roughness: 0.7, side: THREE.DoubleSide })
+            );
+        }
+
+        function createSpiralGalaxy() {
+            const particleCount = 10000;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+
+            const palette = [
+                new THREE.Color(0xFFD700),
+                new THREE.Color(0xFFEB3B),
+                new THREE.Color(0xFFF59D),
+                new THREE.Color(0xE040FB),
+                new THREE.Color(0xFFFFFF)
+            ];
+
+            for (let i = 0; i < particleCount; i++) {
+                const r = Math.pow(Math.random(), 1.5) * 115;
+                const armAngle = ((i % 4) / 4) * Math.PI * 2;
+                const angle = armAngle + r * 0.075 + (Math.random() - 0.5) * 0.22;
+
+                positions[i * 3] = Math.cos(angle) * r + (Math.random() - 0.5) * 8;
+                positions[i * 3 + 1] = (Math.random() - 0.5) * (8 + r * 0.08);
+                positions[i * 3 + 2] = Math.sin(angle) * r + (Math.random() - 0.5) * 8;
+
+                const col = palette[Math.floor(Math.random() * palette.length)];
+                colors[i * 3] = col.r;
+                colors[i * 3 + 1] = col.g;
+                colors[i * 3 + 2] = col.b;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 16;
+            canvas.height = 16;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(8,8,0, 8,8,8);
+            grad.addColorStop(0, 'rgba(255,255,255,1)');
+            grad.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0,0,16,16);
+
+            const material = new THREE.PointsMaterial({
+                size: 0.85,
+                vertexColors: true,
+                map: new THREE.CanvasTexture(canvas),
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            galaxyParticleSystem = new THREE.Points(geometry, material);
+            scene.add(galaxyParticleSystem);
+        }
+
+        function createFloatingPetals() {
+            const petalCount = 220;
+            const geo = new THREE.BufferGeometry();
+            const positions = new Float32Array(petalCount * 3);
+
+            for (let i = 0; i < petalCount; i++) {
+                positions[i * 3] = (Math.random() - 0.5) * 200;
+                positions[i * 3 + 1] = (Math.random() - 0.5) * 100;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 200;
+            }
+
+            geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            const mat = new THREE.PointsMaterial({
+                color: 0xFFD700,
+                size: 1.1,
+                transparent: true,
+                opacity: 0.75,
+                blending: THREE.AdditiveBlending
+            });
+
+            floatingPetalsSystem = new THREE.Points(geo, mat);
+            scene.add(floatingPetalsSystem);
+        }
+
+        function createPlanetLabel(data, index) {
+            const labelEl = document.createElement('div');
+            labelEl.className = 'planet-label';
+            labelEl.id = `label-${index}`;
+            labelEl.innerHTML = `<div class="planet-label-inner">${data.title}</div>`;
+            labelsContainer.appendChild(labelEl);
+        }
+
+        function updateLabels() {
+            const tempV = new THREE.Vector3();
+            bouquetPlanets.forEach((p, idx) => {
+                p.mesh.getWorldPosition(tempV);
+                tempV.project(camera);
+
+                if (tempV.z > 1) {
+                    document.getElementById(`label-${idx}`).style.display = 'none';
+                    return;
+                }
+
+                const x = (tempV.x * .5 + .5) * window.innerWidth;
+                const y = (tempV.y * -.5 + .5) * window.innerHeight;
+
+                const labelEl = document.getElementById(`label-${idx}`);
+                labelEl.style.display = 'block';
+                labelEl.style.left = `${x}px`;
+                labelEl.style.top = `${y - 20}px`;
+            });
+        }
+
+        function onPointerDown(event) {
+            if (event.target.closest('button') || event.target.closest('#info-modal') || event.target.closest('#welcome-modal')) return;
+
+            const clientX = event.clientX || (event.touches && event.touches[0].clientX);
+            const clientY = event.clientY || (event.touches && event.touches[0].clientY);
+
+            if (!clientX || !clientY) return;
+
+            mouse.x = (clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            const targetSpheres = bouquetPlanets.map(p => p.baseSphere);
+            const intersects = raycaster.intersectObjects(targetSpheres);
+
+            if (intersects.length > 0) {
+                const hitSphere = intersects[0].object;
+                const planetIdx = hitSphere.userData.planetIndex;
+                const planetObj = bouquetPlanets[planetIdx];
+
+                if (planetObj) {
+                    focusOnPlanet(planetObj);
+                }
+            }
+        }
+
+        function focusOnPlanet(planetObj) {
+            modalTitle.innerText = planetObj.data.title;
+            modalDesc.innerText = planetObj.data.desc;
+            modalIndex.innerText = planetObj.index + 1;
+
+            infoModal.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-8');
+            infoModal.classList.add('opacity-100', 'pointer-events-auto', 'translate-y-0');
+
+            const worldPos = new THREE.Vector3();
+            planetObj.mesh.getWorldPosition(worldPos);
+
+            const targetCamPos = worldPos.clone().add(new THREE.Vector3(0, planetObj.data.size * 2, planetObj.data.size * 4));
+
+            let progress = 0;
+            const startCamPos = camera.position.clone();
+            const startTarget = controls.target.clone();
+
+            function animCam() {
+                if (progress < 1) {
+                    progress += 0.05;
+                    camera.position.lerpVectors(startCamPos, targetCamPos, progress);
+                    controls.target.lerpVectors(startTarget, worldPos, progress);
+                    controls.update();
+                    requestAnimationFrame(animCam);
+                }
+            }
+            animCam();
+        }
+
+        function closeModal() {
+            infoModal.classList.add('opacity-0', 'pointer-events-none', 'translate-y-8');
+            infoModal.classList.remove('opacity-100', 'pointer-events-auto', 'translate-y-0');
+        }
+
+        function resetCamera() {
+            closeModal();
+            let progress = 0;
+            const startCamPos = camera.position.clone();
+            const startTarget = controls.target.clone();
+            const defaultCamPos = new THREE.Vector3(0, 45, 100);
+            const defaultTarget = new THREE.Vector3(0, 0, 0);
+
+            function animReset() {
+                if (progress < 1) {
+                    progress += 0.05;
+                    camera.position.lerpVectors(startCamPos, defaultCamPos, progress);
+                    controls.target.lerpVectors(startTarget, defaultTarget, progress);
+                    controls.update();
+                    requestAnimationFrame(animReset);
+                }
+            }
+            animReset();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Orbit bouquet planets
+            bouquetPlanets.forEach(p => {
+                if (isAutoRotating) {
+                    p.angle += p.speed;
+                }
+                p.mesh.position.x = Math.cos(p.angle) * p.radius;
+                p.mesh.position.z = Math.sin(p.angle) * p.radius;
+
+                p.mesh.rotation.y += 0.006;
+            });
+
+            if (galaxyParticleSystem && isAutoRotating) {
+                galaxyParticleSystem.rotation.y += 0.0003;
+            }
+
+            if (floatingPetalsSystem) {
+                const pos = floatingPetalsSystem.geometry.attributes.position.array;
+                for (let i = 1; i < pos.length; i += 3) {
+                    pos[i] -= 0.04;
+                    if (pos[i] < -50) pos[i] = 50;
+                }
+                floatingPetalsSystem.geometry.attributes.position.needsUpdate = true;
+            }
+
+            updateLabels();
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
